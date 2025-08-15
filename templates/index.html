@@ -49,7 +49,7 @@
                 loadingSpinner.classList.remove('hidden');
 
                 try {
-                    const response = await fetch('/api/run_agent', {
+                    const response = await fetch('/chat', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
