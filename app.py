@@ -5,9 +5,10 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.agents import create_react_agent, AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 import os
+from flask_cors import CORS
 
 app = Flask(__name__)
-
+CORS(app)
 @tool
 def get_current_weather(location: str) -> str:
     """
