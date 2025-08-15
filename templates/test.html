@@ -57,7 +57,7 @@
 
     <script>
         // Set up API key and API URLs
-        const apiKey = ""; // Canvas will automatically provide the API key at runtime.
+        const apiKey = {{ api_key }}; // Canvas will automatically provide the API key at runtime.
         const textApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
         const ttsApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
         
