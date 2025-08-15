@@ -63,11 +63,12 @@
                     
                     const data = await response.json();
                     responseText.textContent = data.output;
-                    console.log(data);
+                    
                     responseContainer.classList.remove('hidden');
 
                 } catch (error) {
                     responseText.textContent = `Error: ${error.message}`;
+                    console.log(data);
                     responseContainer.classList.remove('hidden');
                 } finally {
                     // Hide loading spinner
