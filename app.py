@@ -87,6 +87,7 @@ def run_agent():
 
     try:
         # Pass the input to the agent and get the response
+        print("about to execute invoke")
         result = agent_executor.invoke({"input": user_input, "chat_history": []})
         
         # Return the final output as a JSON response
