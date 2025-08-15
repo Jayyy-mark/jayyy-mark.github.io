@@ -58,7 +58,7 @@ except Exception as e:
 def home():
   return render_template("index.html")
   
-@app.route("/api/run_agent", methods=["POST"])
+@app.route("/chat", methods=["POST"])
 def run_agent():
     """
     API endpoint to run the LangChain agent with user input.
