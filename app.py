@@ -6,6 +6,17 @@ from langchain.agents import create_react_agent, AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 import os
 from flask_cors import CORS
+from langchain.memory import ConversationBufferMemory
+from langchain.agents import initialize_agent, AgentType
+
+agent_executor = initialize_agent(
+    tools=tools,
+    llm=llm,
+    agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
+    memory=memory,
+    verbose=True
+)
+
 
 app = Flask(__name__)
 CORS(app)
@@ -40,33 +51,16 @@ try:
         google_api_key=os.getenv("GOOGLE_API_KEY")
     )
     
-       # Create memory to store conversation
-    memory = ConversationBufferMemory(
-        memory_key="chat_history",   # Matches MessagesPlaceholder
+    
+     memory = ConversationBufferMemory(
+        memory_key="chat_history",
         return_messages=True
     )
     
-    # Prompt without agent_scratchpad
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", "You are a helpful assistant. Use the tools provided to answer the user's questions."),
-            MessagesPlaceholder(variable_name="chat_history"),
-            ("human", "{input}"),
-        ]
-    )
-    
-    # Prepare tool names & descriptions
-    tool_names = ", ".join([t.name for t in tools])
-    tool_descriptions = "\n".join([f"{t.name}: {t.description}" for t in tools])
-    
-    # Create agent with memory
-    agent_executor = Agent.initialize(
-        llm=llm,
+    agent_executor = initialize_agent(
         tools=tools,
-        prompt=prompt.partial(
-            tools=tool_descriptions,
-            tool_names=tool_names,
-        ),
+        llm=llm,
+        agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
         memory=memory,
         verbose=True
     )
