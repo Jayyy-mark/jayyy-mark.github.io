@@ -58,7 +58,9 @@
                         $responseText.text(data.output);
                         $responseContainer.removeClass('hidden');
                     },
-                    error: function (xhr) {
+                    error: function (response,xhr) {
+                        console.log(response);
+                        console.log(response['output']);
                         $responseText.text(`Error: ${xhr.status} ${xhr.statusText}`);
                         $responseContainer.removeClass('hidden');
                     },
