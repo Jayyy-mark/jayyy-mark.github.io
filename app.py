@@ -40,7 +40,13 @@ try:
         google_api_key=os.getenv("GOOGLE_API_KEY")
     )
     
-    # Prompt — remove agent_scratchpad
+       # Create memory to store conversation
+    memory = ConversationBufferMemory(
+        memory_key="chat_history",   # Matches MessagesPlaceholder
+        return_messages=True
+    )
+    
+    # Prompt without agent_scratchpad
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", "You are a helpful assistant. Use the tools provided to answer the user's questions."),
@@ -49,23 +55,21 @@ try:
         ]
     )
     
+    # Prepare tool names & descriptions
     tool_names = ", ".join([t.name for t in tools])
     tool_descriptions = "\n".join([f"{t.name}: {t.description}" for t in tools])
     
-    # Create agent
-    agent = create_react_agent(
-        llm,
-        tools,
-        prompt.partial(
+    # Create agent with memory
+    agent_executor = Agent.initialize(
+        llm=llm,
+        tools=tools,
+        prompt=prompt.partial(
             tools=tool_descriptions,
             tool_names=tool_names,
         ),
+        memory=memory,
+        verbose=True
     )
-    
-    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-
-
-    print("LangChain agent initialized successfully!")
 
 except Exception as e:
     print(f"Error initializing LangChain agent: {e}")
