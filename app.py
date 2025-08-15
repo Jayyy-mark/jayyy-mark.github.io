@@ -46,12 +46,14 @@ try:
         ]
     )
 
+    tool_names = ", ".join([t.name for t in tools])
+    tool_descriptions = "\n".join([f"{t.name}: {t.description}" for t in tools])
     agent = create_react_agent(
         llm,
         tools,
         prompt.partial(
-            tools=llm.get_tool_names(tools),
-            tool_names=", ".join([t.name for t in tools]),
+            tools=tool_descriptions,
+            tool_names=tool_names,
         ),
     )
     agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
