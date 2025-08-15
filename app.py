@@ -44,7 +44,7 @@ try:
     )
     
     
-     memory = ConversationBufferMemory(memory_key="chat_history",return_messages=True)
+    memory = ConversationBufferMemory(memory_key="chat_history",return_messages=True)
     
     agent_executor = initialize_agent(
         tools=tools,
