@@ -8,6 +8,51 @@ import os
 
 app = Flask(__name__)
 
+@tool
+def get_current_weather(location: str) -> str:
+    """
+    Retrieves the current weather for a given location.
+    
+    Args:
+        location: The city and state (e.g., "San Francisco, CA").
+    
+    Returns:
+        A string with the current weather information.
+    """
+    if "san francisco" in location.lower():
+        return "The current weather in San Francisco is 65°F and sunny."
+    elif "new york" in location.lower():
+        return "The current weather in New York is 40°F and cloudy."
+    else:
+        return f"Sorry, I cannot get the weather for {location}."
+
+# --- Initialize the model and agent once when the server starts ---
+# This is more efficient than initializing it on every request.
+try:
+    tools = [get_current_weather]
+    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0)
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", "You are a helpful assistant. Use the tools provided to answer the user's questions."),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
+
+    agent = create_react_agent(llm, tools, prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+
+    print("LangChain agent initialized successfully!")
+
+except Exception as e:
+    print(f"Error initializing LangChain agent: {e}")
+    agent_executor = None # Ensure agent is None if initialization fails.
+
+
+# --- Flask Routes ---
+
 @app.route('/')
 def home():
   return render_template("index.html")
