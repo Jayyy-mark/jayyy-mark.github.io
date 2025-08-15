@@ -31,7 +31,11 @@ def get_current_weather(location: str) -> str:
 # This is more efficient than initializing it on every request.
 try:
     tools = [get_current_weather]
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0)
+    llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    temperature=0,
+    google_api_key=os.getenv("GOOGLE_API_KEY")
+    )
 
     prompt = ChatPromptTemplate.from_messages(
         [
