@@ -95,6 +95,6 @@ def run_agent():
 
     except Exception as e:
         print(f"Error invoking agent: {e}")
-        return jsonify({"output": "An error occurred while processing your request."}), 500
+        return jsonify({"output": f"An error occurred while processing your request. {e}"}), 500
 
 app.run(debug=False, host="0.0.0.0")
