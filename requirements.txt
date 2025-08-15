@@ -4,4 +4,5 @@ langchain-google-genai==2.1.9
 openai==1.8.5
 requests==2.31.0
 typing-extensions==4.7.1
+flask_cors 
 gunicorn
