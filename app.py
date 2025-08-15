@@ -30,24 +30,29 @@ def get_current_weather(location: str) -> str:
 # --- Initialize the model and agent once when the server starts ---
 # This is more efficient than initializing it on every request.
 try:
+    # Tools
     tools = [get_current_weather]
+    
+    # LLM
     llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash",
-    temperature=0,
-    google_api_key=os.getenv("GOOGLE_API_KEY")
+        model="gemini-1.5-flash",
+        temperature=0,
+        google_api_key=os.getenv("GOOGLE_API_KEY")
     )
-
+    
+    # Prompt — remove agent_scratchpad
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", "You are a helpful assistant. Use the tools provided to answer the user's questions."),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad"),
         ]
     )
-
+    
     tool_names = ", ".join([t.name for t in tools])
     tool_descriptions = "\n".join([f"{t.name}: {t.description}" for t in tools])
+    
+    # Create agent
     agent = create_react_agent(
         llm,
         tools,
@@ -56,7 +61,9 @@ try:
             tool_names=tool_names,
         ),
     )
+    
     agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+
 
     print("LangChain agent initialized successfully!")
 
