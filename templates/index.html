@@ -33,48 +33,42 @@
             </div>
         </div>
 
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
         <script>
-            document.getElementById('agent-form').addEventListener('submit', async (e) => {
+            $('#agent-form').on('submit', function (e) {
                 e.preventDefault();
-                
-                const userInput = document.getElementById('user-input').value.trim();
-                const responseContainer = document.getElementById('response-container');
-                const responseText = document.getElementById('response-text');
-                const loadingSpinner = document.getElementById('loading-spinner');
-                
+        
+                const userInput = $.trim($('#user-input').val());
+                const $responseContainer = $('#response-container');
+                const $responseText = $('#response-text');
+                const $loadingSpinner = $('#loading-spinner');
+        
                 if (!userInput) return;
-
+        
                 // Show loading spinner and hide previous response
-                responseContainer.classList.add('hidden');
-                loadingSpinner.classList.remove('hidden');
-
-                try {
-                    const response = await fetch('/chat', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ input: userInput })
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                $responseContainer.addClass('hidden');
+                $loadingSpinner.removeClass('hidden');
+        
+                $.ajax({
+                    url: '/chat',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ input: userInput }),
+                    success: function (data) {
+                        $responseText.text(data.output);
+                        $responseContainer.removeClass('hidden');
+                    },
+                    error: function (xhr) {
+                        $responseText.text(`Error: ${xhr.status} ${xhr.statusText}`);
+                        $responseContainer.removeClass('hidden');
+                    },
+                    complete: function () {
+                        // Hide loading spinner
+                        $loadingSpinner.addClass('hidden');
                     }
-                    
-                    const data = await response.json();
-                    responseText.textContent = data.output;
-                    
-                    responseContainer.classList.remove('hidden');
-
-                } catch (error) {
-                    responseText.textContent = `Error: ${error.message}`;
-                    console.log(data);
-                    responseContainer.classList.remove('hidden');
-                } finally {
-                    // Hide loading spinner
-                    loadingSpinner.classList.add('hidden');
-                }
+                });
             });
         </script>
+
     </body>
     </html>
