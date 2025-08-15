@@ -91,7 +91,7 @@ def run_agent():
         print(f"Error invoking agent: {e}")
         return jsonify({"output": f"An error occurred while processing your request. {e}"}), 500
 
-@app.route("/test", methodes=["GET"])
+@app.route("/test", methods=["GET"])
 def test():
     return render_template("test.html", api_key=os.getenv("GOOGLE_API_KEY"))
     
