@@ -9,14 +9,6 @@ from flask_cors import CORS
 from langchain.memory import ConversationBufferMemory
 from langchain.agents import initialize_agent, AgentType
 
-agent_executor = initialize_agent(
-    tools=tools,
-    llm=llm,
-    agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
-    memory=memory,
-    verbose=True
-)
-
 
 app = Flask(__name__)
 CORS(app)
@@ -93,7 +85,7 @@ def run_agent():
     try:
         # Pass the input to the agent and get the response
         print("about to execute invoke")
-        result = agent_executor.invoke({"input": user_input, "chat_history": []})
+        result = agent_executor.invoke({"input": user_input})
         
         # Return the final output as a JSON response
         return jsonify({"output": result["output"]})
