@@ -1,2 +1,7 @@
-flask
+Flask==2.3.3
+langchain-core==0.3.0
+langchain-google-genai==2.1.9
+openai==1.8.5
+requests==2.31.0
+typing-extensions==4.7.1
 gunicorn
