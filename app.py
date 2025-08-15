@@ -46,7 +46,14 @@ try:
         ]
     )
 
-    agent = create_react_agent(llm, tools, prompt)
+    agent = create_react_agent(
+        llm,
+        tools,
+        prompt.partial(
+            tools=llm.get_tool_names(tools),
+            tool_names=", ".join([t.name for t in tools]),
+        ),
+    )
     agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 
     print("LangChain agent initialized successfully!")
