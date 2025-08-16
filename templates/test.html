@@ -8,40 +8,26 @@
 
 <body>
     <h2>Gemini Live TTS Streaming</h2>
-
     <input type="text" id="ttsText" value="Hello Gemini!">
-    <button id="ttsBtn">Speak</button>
-
-    <audio id="player" controls autoplay></audio>
-
-    <!-- Make sure jQuery is loaded -->
-    <script src="{{ url_for('static',filename='js/jquery-3.7.1.js')}}"></script>
-
+    <button id="speakBtn">Speak</button>
+    <audio id="player" controls></audio>
+    
+    <script src="{{ url_for('static',filename='js/jquery-3.7.1.js')"></script>
     <script>
-        $(document).ready(function () {
-            $("#ttsBtn").click(function () {
-                const text = $("#ttsText").val();
-
-                $.ajax({
-                    url: "/speak",
-                    method: "GET",
-                    data: { text: text },
-                    xhrFields: {
-                        responseType: 'blob' // important to get binary audio
-                    },
-                    success: function (data) {
-                        // Create a URL for the audio blob
-                        const audioUrl = URL.createObjectURL(data);
-                        const player = $("#player")[0];
-                        player.src = audioUrl;
-                        player.play();
-                    },
-                    error: function (err) {
-                        console.error("Error fetching TTS:", err);
-                    }
-                });
-            });
+    $("#speakBtn").click(function() {
+        const text = $("#ttsText").val();
+        $.ajax({
+            url: "/speak",
+            data: { text: text },
+            xhrFields: {
+                responseType: 'blob'  // important to receive binary data
+            },
+            success: function(data) {
+                const url = URL.createObjectURL(data);
+                $("#player").attr("src", url)[0].play();
+            }
         });
+    });
     </script>
 
 </body>
