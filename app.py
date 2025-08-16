@@ -28,7 +28,7 @@ GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY")
 LIVE_API_URL = f"wss://generativelanguage.googleapis.com/v1beta/live:connect?key={GEMINI_API_KEY}"
 
 
-app.get("/", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse)
 async def index():
     return templates.TemplateResponse("test.html")
 
