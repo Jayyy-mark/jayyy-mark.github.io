@@ -1,42 +1,21 @@
 <!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <title>Gemini Live TTS</title>
-</head>
-
+<html>
 <body>
-    <h2>Gemini Live TTS Streaming</h2>
-    <input type="text" id="ttsText" value="Hello Gemini!">
-    <button id="speakBtn">Speak</button>
-    <audio id="player" controls></audio>
-    
-    <script src="{{ url_for('static', filename='js/jquery-3.7.1.js') }}"></script>
-    <script>
-    $("#speakBtn").click(function() {
-        const text = $("#ttsText").val();
-        $.ajax({
-            url: "/speak",
-            data: { text: text },
-            xhrFields: {
-                responseType: 'blob'  // receive binary audio
-            },
-            success: function(data) {
-                // Wrap data in Blob with audio MIME type
-                const audioBlob = new Blob([data], { type: 'audio/wav' });
-                const url = URL.createObjectURL(audioBlob);
-                const player = $("#player")[0];
-                player.src = url;
-                player.play();
-            },
-            error: function(err) {
-                console.error("TTS request failed", err);
-            }
-        });
-    });
-    </script>
+<h2>Gemini Live TTS Test</h2>
+<input type="text" id="ttsText" value="Hello Gemini!">
+<button onclick="startTTS()">Check Live</button>
 
+<script>
+async function startTTS() {
+    const text = document.getElementById("ttsText").value;
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${protocol}://${window.location.host}/ws?text=${encodeURIComponent(text)}`);
+
+    ws.onopen = () => console.log("WebSocket connected!");
+    ws.onmessage = (event) => console.log("Received data chunk:", event.data);
+    ws.onclose = () => console.log("WebSocket closed.");
+    ws.onerror = (err) => console.error("WebSocket error:", err);
+}
+</script>
 </body>
-
 </html>
