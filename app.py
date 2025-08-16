@@ -65,4 +65,4 @@ async def websocket_tts(websocket: WebSocket):
             if data.get("event") == "SESSION_DONE":
                 break
 
-    await websocket.close())
+    await websocket.close()
