@@ -37,32 +37,40 @@ async def websocket_tts(websocket: WebSocket):
     await websocket.accept()
     text = websocket.query_params.get("text", "Hello from Gemini TTS!")
 
-    async with websockets.connect(LIVE_API_URL) as ws_gemini:
-        # Setup TTS
-        await ws_gemini.send(json.dumps({
-            "setup": {
-                "model": "gemini-2.5-flash-preview-tts",
-                "voiceConfig": {"voiceName": "Aoede"},
-                "audioConfig": {"audioEncoding": "OGG_OPUS"}
-            }
-        }))
+    try:
+        async with websockets.connect(LIVE_API_URL) as ws_gemini:
+            # Setup TTS
+            await ws_gemini.send(json.dumps({
+                "setup": {
+                    "model": "gemini-2.5-flash-preview-tts",
+                    "voiceConfig": {"voiceName": "Aoede"},
+                    "audioConfig": {"audioEncoding": "OGG_OPUS"}
+                }
+            }))
 
-        # Send text
-        await ws_gemini.send(json.dumps({"input": {"text": "HELLO FROM SERVE"}}))
+            # Send text
+            await ws_gemini.send(json.dumps({"input": {"text": text}}))
 
-        # Stream messages to frontend
-        async for message in ws_gemini:
-            data = json.loads(message)
+            # Stream messages to frontend
+            async for message in ws_gemini:
+                data = json.loads(message)
 
-            # Send JSON directly to frontend
-            await websocket.send_json(data)
+                # Send JSON directly to frontend
+                await websocket.send_json(data)
 
-            # Optional: send audio bytes separately if you want
-            # if "audio" in data:
-            #     chunk = base64.b64decode(data["audio"]["data"])
-            #     await websocket.send_bytes(chunk)
+                # Optional: send audio bytes separately
+                # if "audio" in data:
+                #     chunk = base64.b64decode(data["audio"]["data"])
+                #     await websocket.send_bytes(chunk)
 
-            if data.get("event") == "SESSION_DONE":
-                break
+                if data.get("event") == "SESSION_DONE":
+                    break
 
-    await websocket.close()
+    except Exception as e:
+        # Log or send error message to frontend
+        print("WebSocket error:", e)
+        await websocket.send_json({"error": str(e)})
+
+    finally:
+        await websocket.close()
+
