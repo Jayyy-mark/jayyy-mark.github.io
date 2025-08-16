@@ -1,55 +1,141 @@
 <!DOCTYPE html>
-<html>
-<body>
-<h2>Gemini Live TTS Test</h2>
-<input type="text" id="ttsText" value="Hello Gemini!">
-<button onclick="startTTS()">Check Live</button>
-
-<script>
-let audioCtx = null;
-
-async function startTTS() {
-    const text = document.getElementById("ttsText").value;
-    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-    const ws = new WebSocket(`${protocol}://${window.location.host}/ws?text=${encodeURIComponent(text)}`);
-
-    ws.binaryType = "arraybuffer"; // receive raw PCM
-
-    ws.onopen = () => {
-        console.log("WebSocket connected!");
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Live TTS</title>
+    <!-- Use Tailwind CSS for a clean, modern look -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
-    };
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
 
-    ws.onmessage = (event) => {
-        if (typeof event.data === "string") {
-            console.log("Got text:", event.data);
-            return;
+    <div class="bg-white rounded-xl shadow-2xl p-8 max-w-lg w-full text-center">
+        <h2 class="text-3xl font-bold text-gray-800 mb-6">Gemini Live TTS</h2>
+        
+        <div class="space-y-4">
+            <input
+                type="text"
+                id="ttsText"
+                value="Hello from Gemini!"
+                placeholder="Enter text here..."
+                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200"
+            />
+            <button
+                onclick="startTTS()"
+                class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-blue-700 transition-transform duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+                Start TTS Stream
+            </button>
+        </div>
+
+        <div id="statusMessage" class="mt-6 text-gray-600 text-sm">
+            Ready to connect.
+        </div>
+    </div>
+
+    <script>
+        let audioCtx = null;
+        let audioQueue = [];
+        let isPlaying = false;
+        let ws = null;
+
+        // Function to process the audio queue
+        async function processAudioQueue() {
+            // Only process if the queue has data and we are not already playing a chunk
+            if (audioQueue.length === 0 || isPlaying) {
+                return;
+            }
+
+            isPlaying = true;
+            const arrayBuffer = audioQueue.shift();
+
+            try {
+                // The crucial change: decode compressed audio data
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                
+                // Create a source node and connect it to the audio context destination
+                const source = audioCtx.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(audioCtx.destination);
+                
+                // When the current chunk finishes, play the next one in the queue
+                source.onended = () => {
+                    isPlaying = false;
+                    processAudioQueue(); // Recursively call to process the next item
+                };
+                
+                // Start playing the audio chunk
+                source.start();
+
+            } catch (e) {
+                console.error("Error decoding audio data:", e);
+                // In case of an error, move to the next chunk
+                isPlaying = false;
+                processAudioQueue();
+            }
         }
 
-        // Convert raw PCM16LE -> Float32Array
-        const arrayBuffer = event.data;
-        const pcm16 = new Int16Array(arrayBuffer);
-        const float32 = new Float32Array(pcm16.length);
-        for (let i = 0; i < pcm16.length; i++) {
-            float32[i] = pcm16[i] / 32768.0; // normalize
+        async function startTTS() {
+            // Close any existing WebSocket connection before starting a new one
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
+
+            const text = document.getElementById("ttsText").value;
+            const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+            
+            // Create a new WebSocket connection
+            ws = new WebSocket(`${protocol}://${window.location.host}/ws?text=${encodeURIComponent(text)}`);
+
+            // The WebSocket will receive binary data
+            ws.binaryType = "arraybuffer";
+
+            ws.onopen = () => {
+                console.log("WebSocket connected!");
+                document.getElementById("statusMessage").textContent = "Streaming audio...";
+
+                if (!audioCtx) {
+                    // Create a single AudioContext instance
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+
+                // Clear the queue for a new stream
+                audioQueue = [];
+                isPlaying = false;
+            };
+
+            ws.onmessage = async (event) => {
+                // Handle non-binary messages (e.g., control messages from server)
+                if (typeof event.data === "string") {
+                    console.log("Got text:", event.data);
+                    return;
+                }
+
+                // Push the binary audio chunk to the queue
+                audioQueue.push(event.data);
+                
+                // Start processing the queue if not already started
+                processAudioQueue();
+            };
+
+            ws.onclose = () => {
+                console.log("WebSocket closed.");
+                document.getElementById("statusMessage").textContent = "Stream ended.";
+            };
+
+            ws.onerror = (err) => {
+                console.error("WebSocket error:", err);
+                document.getElementById("statusMessage").textContent = "An error occurred.";
+            };
         }
-
-        // Create AudioBuffer
-        const audioBuffer = audioCtx.createBuffer(1, float32.length, 24000);
-        audioBuffer.getChannelData(0).set(float32);
-
-        // Play it immediately
-        const source = audioCtx.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioCtx.destination);
-        source.start();
-    };
-
-    ws.onclose = () => console.log("WebSocket closed.");
-    ws.onerror = (err) => console.error("WebSocket error:", err);
-}
-</script>
+    </script>
 </body>
 </html>
