@@ -8,6 +8,11 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+# Mount static folder
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Load templates folder
+templates = Jinja2Templates(directory="templates")
 
 # CORS for frontend
 app.add_middleware(
