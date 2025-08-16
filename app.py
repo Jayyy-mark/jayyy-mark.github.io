@@ -38,7 +38,8 @@ async def index():
     
     async function startTTS() {
         const text = document.getElementById("ttsText").value;
-        const ws = new WebSocket("ws://localhost:8000/ws?text=" + encodeURIComponent(text));
+        const ws = new WebSocket(`ws://${window.location.host}/ws?text=${encodeURIComponent(text)}`);
+
         
         ws.binaryType = "arraybuffer";
         
