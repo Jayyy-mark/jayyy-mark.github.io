@@ -20,11 +20,18 @@
             url: "/speak",
             data: { text: text },
             xhrFields: {
-                responseType: 'blob'  // important to receive binary data
+                responseType: 'blob'  // receive binary audio
             },
             success: function(data) {
-                const url = URL.createObjectURL(data);
-                $("#player").attr("src", url)[0].play();
+                // Wrap data in Blob with audio MIME type
+                const audioBlob = new Blob([data], { type: 'audio/wav' });
+                const url = URL.createObjectURL(audioBlob);
+                const player = $("#player")[0];
+                player.src = url;
+                player.play();
+            },
+            error: function(err) {
+                console.error("TTS request failed", err);
             }
         });
     });
