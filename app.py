@@ -39,6 +39,10 @@ async def stream_from_gemini(text: str):
                 audio_chunk = base64.b64decode(data["audio"]["data"])
                 yield audio_chunk
 
+@app.route("/")
+def index():
+    return render_template("test.html")
+
 @app.route("/speak")
 def speak():
     text = request.args.get("text", "Hello from Gemini Live API")
