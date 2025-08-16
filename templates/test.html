@@ -43,87 +43,53 @@
 
     <script>
         let audioCtx = null;
-        let audioQueue = [];
-        let isPlaying = false;
-        let ws = null;
-
-        // Function to process the audio queue
-        async function processAudioQueue() {
-            // Only process if the queue has data and we are not already playing a chunk
-            if (audioQueue.length === 0 || isPlaying) {
-                return;
-            }
-
-            isPlaying = true;
-            const arrayBuffer = audioQueue.shift();
-
-            try {
-                // The crucial change: decode compressed audio data
-                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-                
-                // Create a source node and connect it to the audio context destination
-                const source = audioCtx.createBufferSource();
-                source.buffer = audioBuffer;
-                source.connect(audioCtx.destination);
-                
-                // When the current chunk finishes, play the next one in the queue
-                source.onended = () => {
-                    isPlaying = false;
-                    processAudioQueue(); // Recursively call to process the next item
-                };
-                
-                // Start playing the audio chunk
-                source.start();
-
-            } catch (e) {
-                console.error("Error decoding audio data:", e);
-                // In case of an error, move to the next chunk
-                isPlaying = false;
-                processAudioQueue();
-            }
-        }
+        const SAMPLE_RATE = 24000; // The sample rate returned by the Gemini TTS API
 
         async function startTTS() {
-            // Close any existing WebSocket connection before starting a new one
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.close();
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
             }
-
+            
             const text = document.getElementById("ttsText").value;
             const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-            
-            // Create a new WebSocket connection
-            ws = new WebSocket(`${protocol}://${window.location.host}/ws?text=${encodeURIComponent(text)}`);
+            const ws = new WebSocket(`${protocol}://${window.location.host}/ws?text=${encodeURIComponent(text)}`);
 
-            // The WebSocket will receive binary data
-            ws.binaryType = "arraybuffer";
+            ws.binaryType = "arraybuffer"; // Set binary type to arraybuffer for raw data
 
             ws.onopen = () => {
                 console.log("WebSocket connected!");
                 document.getElementById("statusMessage").textContent = "Streaming audio...";
-
                 if (!audioCtx) {
-                    // Create a single AudioContext instance
-                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SAMPLE_RATE });
                 }
-
-                // Clear the queue for a new stream
-                audioQueue = [];
-                isPlaying = false;
             };
 
             ws.onmessage = async (event) => {
-                // Handle non-binary messages (e.g., control messages from server)
                 if (typeof event.data === "string") {
                     console.log("Got text:", event.data);
                     return;
                 }
 
-                // Push the binary audio chunk to the queue
-                audioQueue.push(event.data);
+                const arrayBuffer = event.data;
                 
-                // Start processing the queue if not already started
-                processAudioQueue();
+                // Decode the raw signed 16-bit PCM data
+                const pcm16 = new Int16Array(arrayBuffer);
+                const float32 = new Float32Array(pcm16.length);
+
+                // Convert to Float32Array and normalize
+                for (let i = 0; i < pcm16.length; i++) {
+                    float32[i] = pcm16[i] / 32768.0; // Normalize by dividing by the max signed 16-bit value
+                }
+
+                // Create a new AudioBuffer with the correct format and sample rate
+                const audioBuffer = audioCtx.createBuffer(1, float32.length, audioCtx.sampleRate);
+                audioBuffer.getChannelData(0).set(float32);
+
+                // Play the audio buffer immediately
+                const source = audioCtx.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(audioCtx.destination);
+                source.start();
             };
 
             ws.onclose = () => {
