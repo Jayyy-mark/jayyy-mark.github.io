@@ -20,42 +20,10 @@ app.add_middleware(
 GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY")
 LIVE_API_URL = f"wss://generativelanguage.googleapis.com/v1beta/live:connect?key={GEMINI_API_KEY}"
 
-@app.get("/")
-async def index():
-    html_content = """
-    <!DOCTYPE html>
-    <html>
-    <body>
-    <h2>Gemini Live TTS</h2>
-    <input type="text" id="ttsText" value="Hello Gemini!">
-    <button onclick="startTTS()">Speak</button>
-    <audio id="player" controls autoplay></audio>
-    
-    <script>
-    let mediaSource = new MediaSource();
-    let audioElem = document.getElementById("player");
-    audioElem.src = URL.createObjectURL(mediaSource);
-    
-    async function startTTS() {
-        const text = document.getElementById("ttsText").value;
-        const ws = new WebSocket(`ws://${window.location.host}/ws?text=${encodeURIComponent(text)}`);
 
-        
-        ws.binaryType = "arraybuffer";
-        
-        mediaSource.addEventListener('sourceopen', () => {
-            let sourceBuffer = mediaSource.addSourceBuffer('audio/ogg; codecs=opus');
-            
-            ws.onmessage = (event) => {
-                sourceBuffer.appendBuffer(new Uint8Array(event.data));
-            };
-        });
-    }
-    </script>
-    </body>
-    </html>
-    """
-    return HTMLResponse(html_content)
+app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 @app.websocket("/ws")
 async def websocket_tts(websocket: WebSocket):
