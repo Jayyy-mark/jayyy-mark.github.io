@@ -3,7 +3,7 @@ import websockets
 import json
 import base64
 import os
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket,Request
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
