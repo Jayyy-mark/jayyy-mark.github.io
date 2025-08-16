@@ -7,4 +7,10 @@ requests
 typing-extensions
 flask_cors 
 websockets
-gunicorn
+fastapi 
+uvicorn 
+websockets 
+python-multipart
+aiofiles
+"jinja2"
+
