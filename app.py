@@ -1,98 +1,53 @@
-
-from flask import Flask, request, render_template, jsonify
-from langchain_core.tools import tool
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.agents import create_react_agent, AgentExecutor
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-import os
+from flask import Flask, Response, request
+import asyncio
+import websockets
+import json
+import base64
 from flask_cors import CORS
-from langchain.memory import ConversationBufferMemory
-from langchain.agents import initialize_agent, AgentType
-
+import os
 
 app = Flask(__name__)
 CORS(app)
-@tool
-def get_current_weather(location: str) -> str:
-    """
-    Retrieves the current weather for a given location.
-    
-    Args:
-        location: The city and state (e.g., "San Francisco, CA").
-    
-    Returns:
-        A string with the current weather information.
-    """
-    if "san francisco" in location.lower():
-        return "The current weather in San Francisco is 65°F and sunny."
-    elif "new york" in location.lower():
-        return "The current weather in New York is 40°F and cloudy."
-    else:
-        return f"Sorry, I cannot get the weather for {location}."
 
-# --- Initialize the model and agent once when the server starts ---
-# This is more efficient than initializing it on every request.
-try:
-    # Tools
-    tools = [get_current_weather]
-    
-    # LLM
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
-        temperature=0,
-        google_api_key=os.getenv("GOOGLE_API_KEY")
-    )
-    
-    
-    memory = ConversationBufferMemory(memory_key="chat_history",return_messages=True)
-    
-    agent_executor = initialize_agent(
-        tools=tools,
-        llm=llm,
-        agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
-        memory=memory,
-        verbose=True
-    )
+# Replace with your Gemini API key
+GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY")
+LIVE_API_URL = "wss://generativelanguage.googleapis.com/v1beta/live:connect?key=" + GEMINI_API_KEY
 
-except Exception as e:
-    print(f"Error initializing LangChain agent: {e}")
-    agent_executor = None # Ensure agent is None if initialization fails.
+async def stream_from_gemini(text: str):
+    async with websockets.connect(LIVE_API_URL) as ws:
+        # 1. Send setup event (tell Gemini to use TTS)
+        await ws.send(json.dumps({
+            "setup": {
+                "model": "gemini-2.5-flash-preview-tts",
+                "voiceConfig": {
+                    "voiceName": "Aoede"  # You can change to Kore, Puck, etc.
+                }
+            }
+        }))
 
+        # 2. Send the text we want to synthesize
+        await ws.send(json.dumps({
+            "input": {
+                "text": text
+            }
+        }))
 
-# --- Flask Routes ---
+        # 3. Collect and stream back audio chunks
+        async for message in ws:
+            data = json.loads(message)
+            if "audio" in data:
+                audio_chunk = base64.b64decode(data["audio"]["data"])
+                yield audio_chunk
 
-@app.route('/')
-def home():
-  return render_template("index.html")
-  
-@app.route("/chat", methods=["POST"])
-def run_agent():
-    """
-    API endpoint to run the LangChain agent with user input.
-    """
-    if not agent_executor:
-        return jsonify({"output": "The agent is not available. Please check the server logs."}), 500
+@app.route("/speak")
+def speak():
+    text = request.args.get("text", "Hello from Gemini Live API")
 
-    data = request.json
-    user_input = data.get("input", "")
+    async def generate():
+        async for chunk in stream_from_gemini(text):
+            yield chunk
 
-    if not user_input:
-        return jsonify({"output": "Please provide an input."}), 400
+    return Response(generate(), mimetype="audio/wav")
 
-    try:
-        # Pass the input to the agent and get the response
-        print("about to execute invoke")
-        result = agent_executor.invoke({"input": user_input})
-        
-        # Return the final output as a JSON response
-        return jsonify({"output": result["output"]})
-
-    except Exception as e:
-        print(f"Error invoking agent: {e}")
-        return jsonify({"output": f"An error occurred while processing your request. {e}"}), 500
-
-@app.route("/test", methods=["GET"])
-def test():
-    return render_template("test.html", api_key=os.getenv("GOOGLE_API_KEY"))
-    
-app.run(debug=False, host="0.0.0.0")
+if name == "main":
+    app.run(host="0.0.0.0", port=5000, debug=True)
