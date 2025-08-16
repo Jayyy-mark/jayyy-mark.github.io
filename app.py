@@ -23,7 +23,7 @@ LIVE_API_URL = f"wss://generativelanguage.googleapis.com/v1beta/live:connect?key
 
 app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse("test.html", {"request": request})
 
 @app.websocket("/ws")
 async def websocket_tts(websocket: WebSocket):
