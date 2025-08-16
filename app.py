@@ -53,5 +53,5 @@ def speak():
 
     return Response(generate(), mimetype="audio/wav")
 
-if name == "main":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+
+app.run(host="0.0.0.0", port=5000, debug=True)
