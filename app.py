@@ -3,7 +3,7 @@ import websockets
 import json
 import base64
 import os
-from fastapi import FastAPI, WebSocket,Request
+from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -22,8 +22,8 @@ LIVE_API_URL = f"wss://generativelanguage.googleapis.com/v1beta/live:connect?key
 
 
 app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    return templates.TemplateResponse("test.html", {"request": request})
+async def index():
+    return templates.TemplateResponse("test.html")
 
 @app.websocket("/ws")
 async def websocket_tts(websocket: WebSocket):
