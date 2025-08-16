@@ -1,63 +1,83 @@
-import io
-import wave
-from flask import Flask, Response, request, render_template
 import asyncio
 import websockets
 import json
 import base64
-from flask_cors import CORS
 import os
+from fastapi import FastAPI, WebSocket
+from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 
-app = Flask(__name__)
-CORS(app)
+app = FastAPI()
+
+# CORS for frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY")
-LIVE_API_URL = "wss://generativelanguage.googleapis.com/v1beta/live:connect?key=" + GEMINI_API_KEY
+LIVE_API_URL = f"wss://generativelanguage.googleapis.com/v1beta/live:connect?key={GEMINI_API_KEY}"
 
-async def stream_from_gemini(text: str):
-    async with websockets.connect(LIVE_API_URL) as ws:
-        await ws.send(json.dumps({
+@app.get("/")
+async def index():
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <body>
+    <h2>Gemini Live TTS</h2>
+    <input type="text" id="ttsText" value="Hello Gemini!">
+    <button onclick="startTTS()">Speak</button>
+    <audio id="player" controls autoplay></audio>
+    
+    <script>
+    let mediaSource = new MediaSource();
+    let audioElem = document.getElementById("player");
+    audioElem.src = URL.createObjectURL(mediaSource);
+    
+    async function startTTS() {
+        const text = document.getElementById("ttsText").value;
+        const ws = new WebSocket("ws://localhost:8000/ws?text=" + encodeURIComponent(text));
+        
+        ws.binaryType = "arraybuffer";
+        
+        mediaSource.addEventListener('sourceopen', () => {
+            let sourceBuffer = mediaSource.addSourceBuffer('audio/ogg; codecs=opus');
+            
+            ws.onmessage = (event) => {
+                sourceBuffer.appendBuffer(new Uint8Array(event.data));
+            };
+        });
+    }
+    </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(html_content)
+
+@app.websocket("/ws")
+async def websocket_tts(websocket: WebSocket):
+    await websocket.accept()
+    text = websocket.query_params.get("text", "Hello from Gemini TTS!")
+    
+    async with websockets.connect(LIVE_API_URL) as ws_gemini:
+        # Setup TTS
+        await ws_gemini.send(json.dumps({
             "setup": {
                 "model": "gemini-2.5-flash-preview-tts",
                 "voiceConfig": {"voiceName": "Aoede"}
             }
         }))
-        await ws.send(json.dumps({"input": {"text": text}}))
-
-        async for message in ws:
+        # Send text
+        await ws_gemini.send(json.dumps({"input": {"text": text}}))
+        
+        # Stream audio chunks to frontend
+        async for message in ws_gemini:
             data = json.loads(message)
             if "audio" in data:
-                yield base64.b64decode(data["audio"]["data"])
-
-@app.route("/")
-def index():
-    return render_template("test.html")
-
-@app.route("/speak")
-def speak():
-    text = request.args.get("text", "Hello from Gemini Live API")
-
-    # Collect all chunks first
-    async def generate_full_wav():
-        audio_chunks = []
-        async for chunk in stream_from_gemini(text):
-            audio_chunks.append(chunk)
-
-        audio_data = b"".join(audio_chunks)
-        audio_buffer = io.BytesIO()
-
-        # Create WAV in memory
-        with wave.open(audio_buffer, 'wb') as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)
-            wf.setframerate(24000)
-            wf.writeframes(audio_data)
-
-        audio_buffer.seek(0)
-        return audio_buffer.read()
-
-    # Flask cannot directly await, so run asyncio
-    audio_bytes = asyncio.run(generate_full_wav())
-    return Response(audio_bytes, mimetype="audio/wav")
-
-app.run(host="0.0.0.0", port=5000, debug=True)
+                chunk = base64.b64decode(data["audio"]["data"])
+                await websocket.send_bytes(chunk)
+            elif data.get("event") == "SESSION_DONE":
+                break
+    await websocket.close()
