@@ -1,359 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Agent App</title>
-    <!-- Tailwind CSS from CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { font-family: sans-serif; }
-        .mic-active {
-            animation: pulse 1s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% {
-                transform: scale(1);
-            }
-            50% {
-                transform: scale(1.1);
-            }
-        }
-    </style>
+    <title>Gemini Live TTS</title>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
-    <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Gemini Agent App</h1>
-        
-        <form id="agent-form" class="flex flex-col gap-4">
-            <div class="flex items-center gap-2">
-                <input type="text" id="user-input" name="user_input" placeholder="Ask about the weather..."
-                       class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <button type="button" id="voice-input-btn" class="p-3 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors duration-200" title="Voice Input">
-                    <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-gray-600">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5a6 6 0 1 0-12 0v1.5a6 6 0 0 0 6 6Z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M10.125 3.75a2.625 2.625 0 1 1 5.25 0m-5.25 6.75a6 6 0 0 1 6-6v-1.5a6 6 0 1 0-12 0v1.5a6 6 0 0 1 6 6Z" />
-                    </svg>
-                </button>
-            </div>
-            <button type="submit"
-                    class="bg-blue-600 text-white p-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200">
-                Get Response
-            </button>
-        </form>
-        
-        <div id="response-container" class="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg hidden">
-            <p id="response-text" class="text-gray-800"></p>
-            <button type="button" id="gemini-tts-btn" class="mt-2 p-2 bg-gray-200 rounded-lg font-semibold hover:bg-gray-300 transition-colors duration-200 text-sm" title="Play with Gemini Voice">
-                Play Response
-            </button>
-        </div>
 
-        <div id="loading-spinner" class="mt-6 text-center hidden">
-            <div class="animate-spin inline-block w-8 h-8 border-4 border-t-4 border-gray-200 rounded-full border-t-blue-500"></div>
-            <p class="mt-2 text-gray-500">Thinking...</p>
-        </div>
-    </div>
+<body>
+    <h2>Gemini Live TTS Streaming</h2>
+
+    <input type="text" id="ttsText" value="Hello Gemini!">
+    <button id="ttsBtn">Speak</button>
+
+    <audio id="player" controls autoplay></audio>
+
+    <!-- Make sure jQuery is loaded -->
+    <script src="{{ url_for('static',filename='js/jquery-3.7.1.js')}}"></script>
 
     <script>
-        // Set up API key and API URLs
-        const apiKey = "{{ api_key }}"; // Canvas will automatically provide the API key at runtime.
-        const textApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-        const ttsApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
-        
-        // --- Helper Functions ---
+        $(document).ready(function () {
+            $("#ttsBtn").click(function () {
+                const text = $("#ttsText").val();
 
-        // Exponential backoff for API calls
-        async function fetchWithExponentialBackoff(url, options, retries = 3, delay = 1000) {
-            try {
-                const response = await fetch(url, options);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response;
-            } catch (error) {
-                if (retries > 0) {
-                    console.warn(`Fetch failed, retrying in ${delay}ms... Retries left: ${retries}`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    return fetchWithExponentialBackoff(url, options, retries - 1, delay * 2);
-                } else {
-                    throw error;
-                }
-            }
-        }
-
-        // Helper function to convert PCM audio to a WAV file Blob
-        function pcmToWav(pcmData, sampleRate) {
-            const pcm16 = new Int16Array(pcmData);
-            const wavHeader = new ArrayBuffer(44);
-            const view = new DataView(wavHeader);
-
-            // RIFF identifier
-            view.setUint32(0, 0x52494646, false); // "RIFF"
-            // file length
-            view.setUint32(4, 36 + pcm16.byteLength, true);
-            // RIFF type
-            view.setUint32(8, 0x57415645, false); // "WAVE"
-            // format chunk identifier
-            view.setUint32(12, 0x666d7420, false); // "fmt "
-            // format chunk length
-            view.setUint32(16, 16, true);
-            // sample format (1 = PCM)
-            view.setUint16(20, 1, true);
-            // channel count
-            view.setUint16(22, 1, true); // Mono
-            // sample rate
-            view.setUint32(24, sampleRate, true);
-            // byte rate (sample rate * block align)
-            view.setUint32(28, sampleRate * 2, true);
-            // block align (channels * bytes per sample)
-            view.setUint16(32, 2, true);
-            // bits per sample
-            view.setUint16(34, 16, true);
-            // data chunk identifier
-            view.setUint32(36, 0x64617461, false); // "data"
-            // data chunk length
-            view.setUint32(40, pcm16.byteLength, true);
-
-            const wavBlob = new Blob([wavHeader, pcm16], { type: 'audio/wav' });
-            return wavBlob;
-        }
-
-        // --- UI Element References ---
-        const form = document.getElementById('agent-form');
-        const userInputField = document.getElementById('user-input');
-        const voiceInputBtn = document.getElementById('voice-input-btn');
-        const micIcon = document.getElementById('mic-icon');
-        const responseContainer = document.getElementById('response-container');
-        const responseText = document.getElementById('response-text');
-        const loadingSpinner = document.getElementById('loading-spinner');
-        const geminiTtsBtn = document.getElementById('gemini-tts-btn');
-
-        // --- Speech-to-Text Setup ---
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            const recognition = new SpeechRecognition();
-            recognition.continuous = false;
-            recognition.lang = 'en-US';
-
-            recognition.onstart = () => {
-                micIcon.classList.add('mic-active');
-                userInputField.placeholder = "Listening...";
-            };
-
-            recognition.onresult = (event) => {
-                const transcript = event.results[0][0].transcript;
-                userInputField.value = transcript;
-            };
-
-            recognition.onerror = (event) => {
-                console.error('Speech recognition error:', event.error);
-                userInputField.placeholder = "Voice input failed.";
-            };
-
-            recognition.onend = () => {
-                micIcon.classList.remove('mic-active');
-                userInputField.placeholder = "Ask about the weather...";
-            };
-
-            voiceInputBtn.addEventListener('click', () => {
-                if (micIcon.classList.contains('mic-active')) {
-                    recognition.stop();
-                } else {
-                    recognition.start();
-                }
+                $.ajax({
+                    url: "/speak",
+                    method: "GET",
+                    data: { text: text },
+                    xhrFields: {
+                        responseType: 'blob' // important to get binary audio
+                    },
+                    success: function (data) {
+                        // Create a URL for the audio blob
+                        const audioUrl = URL.createObjectURL(data);
+                        const player = $("#player")[0];
+                        player.src = audioUrl;
+                        player.play();
+                    },
+                    error: function (err) {
+                        console.error("Error fetching TTS:", err);
+                    }
+                });
             });
-        } else {
-            voiceInputBtn.style.display = 'none';
-            console.warn("Web Speech API is not supported in this browser.");
-        }
-
-        // --- Text-to-Speech Setup (Gemini) ---
-        geminiTtsBtn.addEventListener('click', async () => {
-            const text = responseText.textContent;
-            if (!text) return;
-
-            loadingSpinner.classList.remove('hidden');
-
-            const payload = {
-                "contents": [{"parts": [{"text": text}]}],
-                "generationConfig": {
-                    "responseModalities": ["AUDIO"],
-                    "speechConfig": {
-                        "voiceConfig": {
-                            "prebuiltVoiceConfig": {"voiceName": "Kore"}
-                        }
-                    }
-                },
-                "model": "gemini-2.5-flash-preview-tts"
-            };
-
-            try {
-                const response = await fetchWithExponentialBackoff(ttsApiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                
-                const result = await response.json();
-                
-                const part = result?.candidates?.[0]?.content?.parts?.[0];
-                const audioData = part?.inlineData?.data;
-                const mimeType = part?.inlineData?.mimeType;
-
-                if (audioData && mimeType && mimeType.startsWith("audio/L16")) {
-                    const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)[1], 10);
-                    const pcmData = Uint8Array.from(atob(audioData), c => c.charCodeAt(0));
-                    const wavBlob = pcmToWav(pcmData.buffer, sampleRate);
-                    const audioUrl = URL.createObjectURL(wavBlob);
-                    const audio = new Audio(audioUrl);
-                    audio.play();
-
-                    audio.onended = () => {
-                        URL.revokeObjectURL(audioUrl);
-                    };
-                } else {
-                    console.error("Invalid audio data from server.");
-                    responseText.textContent = "Error: Could not synthesize audio.";
-                }
-            } catch (error) {
-                console.error("Error calling Gemini TTS API:", error);
-                responseText.textContent = "Error: Failed to get audio from the API.";
-            } finally {
-                loadingSpinner.classList.add('hidden');
-            }
-        });
-
-        // --- Tool Definitions ---
-        // This function mimics the Python tool and handles its logic.
-        const tools = {
-            get_current_weather: {
-                execute: (location) => {
-                    if (location.toLowerCase().includes("san francisco")) {
-                        return "The current weather in San Francisco is 65°F and sunny.";
-                    } else if (location.toLowerCase().includes("new york")) {
-                        return "The current weather in New York is 40°F and cloudy.";
-                    } else {
-                        return `Sorry, I cannot get the weather for ${location}.`;
-                    }
-                }
-            }
-        };
-
-        // --- Main Text Generation & Tool Calling Logic ---
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const userInput = userInputField.value.trim();
-            if (!userInput) return;
-
-            responseContainer.classList.add('hidden');
-            loadingSpinner.classList.remove('hidden');
-
-            try {
-                // Step 1: Initial call to the model with tool definitions
-                const initialPayload = {
-                    "contents": [{
-                        "role": "user",
-                        "parts": [{ "text": userInput }]
-                    }],
-                    "tools": [{
-                        "functionDeclarations": [{
-                            "name": "get_current_weather",
-                            "description": "Retrieves the current weather for a given location.",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "location": { "type": "string", "description": "The city and state (e.g., 'San Francisco, CA')." }
-                                },
-                                "required": ["location"]
-                            }
-                        }]
-                    }],
-                    "generationConfig": {
-                        "responseMimeType": "application/json",
-                        "responseSchema": {
-                            "type": "object",
-                            "properties": {
-                                "output": { "type": "string" },
-                                "tool_calls": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "name": { "type": "string" },
-                                            "args": { "type": "object" }
-                                        },
-                                        "required": ["name", "args"]
-                                    }
-                                }
-                            }
-                        }
-                    }
-                };
-                
-                let response = await fetchWithExponentialBackoff(textApiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(initialPayload)
-                });
-                
-                let result = await response.json();
-                let data = JSON.parse(result?.candidates?.[0]?.content?.parts?.[0]?.text || '{}');
-
-                // Step 2: Check for tool calls and execute them
-                if (data.tool_calls && data.tool_calls.length > 0) {
-                    const toolCall = data.tool_calls[0];
-                    const functionName = toolCall.name;
-                    const functionArgs = toolCall.args;
-                    
-                    const toolToExecute = tools[functionName];
-                    if (toolToExecute) {
-                        const toolOutput = toolToExecute.execute(functionArgs.location);
-                        
-                        // Step 3: Send tool output back to the model for a final response
-                        const toolResponsePayload = {
-                            "contents": [
-                                { "role": "user", "parts": [{ "text": userInput }] },
-                                {
-                                    "role": "model",
-                                    "parts": [{
-                                        "functionCall": {
-                                            "name": functionName,
-                                            "args": functionArgs
-                                        }
-                                    }]
-                                },
-                                {
-                                    "role": "tool",
-                                    "parts": [{ "functionResponse": { "name": functionName, "response": { "output": toolOutput } } }]
-                                }
-                            ]
-                        };
-
-                        response = await fetchWithExponentialBackoff(textApiUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(toolResponsePayload)
-                        });
-
-                        result = await response.json();
-                        data = JSON.parse(result?.candidates?.[0]?.content?.parts?.[0]?.text || '{}');
-                    }
-                }
-                
-                // Final response handling
-                responseText.textContent = data.output || "No response found.";
-                responseContainer.classList.remove('hidden');
-
-            } catch (error) {
-                console.error("An error occurred:", error);
-                responseText.textContent = "An error occurred while processing your request.";
-                responseContainer.classList.remove('hidden');
-            } finally {
-                loadingSpinner.classList.add('hidden');
-            }
         });
     </script>
+
 </body>
+
 </html>
