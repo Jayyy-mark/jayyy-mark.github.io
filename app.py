@@ -48,7 +48,7 @@ async def websocket_tts(websocket: WebSocket):
         }))
 
         # Send text
-        await ws_gemini.send(json.dumps({"input": {"text": text}}))
+        await ws_gemini.send(json.dumps({"input": {"text": "HELLO FROM SERVE"}}))
 
         # Stream messages to frontend
         async for message in ws_gemini:
