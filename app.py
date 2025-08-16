@@ -47,11 +47,26 @@ def index():
 def speak():
     text = request.args.get("text", "Hello from Gemini Live API")
 
-    async def generate():
-        async for chunk in stream_from_gemini(text):
-            yield chunk
+    async def generate_wav():
+        audio_buffer = io.BytesIO()
+        sample_rate = 24000  # Gemini TTS default
+        num_channels = 1
+        sampwidth = 2  # 16-bit PCM
 
-    return Response(generate(), mimetype="audio/wav")
+        # Create a WAV file in memory
+        with wave.open(audio_buffer, 'wb') as wf:
+            wf.setnchannels(num_channels)
+            wf.setsampwidth(sampwidth)
+            wf.setframerate(sample_rate)
+
+            # Collect audio chunks
+            async for chunk in stream_from_gemini(text):
+                wf.writeframes(chunk)
+
+        audio_buffer.seek(0)
+        yield audio_buffer.read()
+
+    return Response(generate_wav(), mimetype="audio/wav")
 
 
 app.run(host="0.0.0.0", port=5000, debug=True)
