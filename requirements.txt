@@ -6,4 +6,5 @@ openai
 requests
 typing-extensions
 flask_cors 
+websockets
 gunicorn
