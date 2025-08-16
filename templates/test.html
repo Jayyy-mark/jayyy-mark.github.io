@@ -6,13 +6,47 @@
 <button onclick="startTTS()">Check Live</button>
 
 <script>
+let audioCtx = null;
+
 async function startTTS() {
     const text = document.getElementById("ttsText").value;
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     const ws = new WebSocket(`${protocol}://${window.location.host}/ws?text=${encodeURIComponent(text)}`);
 
-    ws.onopen = () => console.log("WebSocket connected!");
-    ws.onmessage = (event) => console.log("Received data chunk:", event.data);
+    ws.binaryType = "arraybuffer"; // receive raw PCM
+
+    ws.onopen = () => {
+        console.log("WebSocket connected!");
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+        }
+    };
+
+    ws.onmessage = (event) => {
+        if (typeof event.data === "string") {
+            console.log("Got text:", event.data);
+            return;
+        }
+
+        // Convert raw PCM16LE -> Float32Array
+        const arrayBuffer = event.data;
+        const pcm16 = new Int16Array(arrayBuffer);
+        const float32 = new Float32Array(pcm16.length);
+        for (let i = 0; i < pcm16.length; i++) {
+            float32[i] = pcm16[i] / 32768.0; // normalize
+        }
+
+        // Create AudioBuffer
+        const audioBuffer = audioCtx.createBuffer(1, float32.length, 24000);
+        audioBuffer.getChannelData(0).set(float32);
+
+        // Play it immediately
+        const source = audioCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioCtx.destination);
+        source.start();
+    };
+
     ws.onclose = () => console.log("WebSocket closed.");
     ws.onerror = (err) => console.error("WebSocket error:", err);
 }
